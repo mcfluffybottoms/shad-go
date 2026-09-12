@@ -32,6 +32,7 @@ func main() {
 		}
 
 		printStack(stack)
+		printOps(e)
 	}
 }
 
@@ -41,4 +42,15 @@ func printStack(stack []int) {
 		s = append(s, strconv.Itoa(n))
 	}
 	fmt.Printf("Stack: %s\n", strings.Join(s, ", "))
+}
+
+func printOps(e *Evaluator) {
+	for k, v := range e.operations {
+		fmt.Printf("%s: ", k)
+		s := make([]string, 0, len(v))
+		for _, n := range v {
+			s = append(s, n)
+		}
+		fmt.Printf("\t%s\n", strings.Join(s, ", "))
+	}
 }
