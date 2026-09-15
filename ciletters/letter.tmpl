@@ -1,0 +1,15 @@
+{{- if isPipelineOK .Pipeline.Status }}Your pipeline #{{ .Pipeline.ID }} passed!
+{{- else }}Your pipeline #{{ .Pipeline.ID }} has failed!
+{{- end }}
+{{ printf "    %-14s%s/%s" "Project:" .Project.GroupID .Project.ID }}
+{{ printf "    %-14s🌿 %s" "Branch:" .Branch }}
+{{ printf "    %-14s%s %s" "Commit:" (trimHash .Commit.Hash) .Commit.Message }}
+{{ printf "    %-14s%s" "CommitAuthor:" .Commit.Author }}
+{{- if not (isPipelineOK .Pipeline.Status) -}}
+{{- range .Pipeline.FailedJobs }}
+        Stage: {{ .Stage }}, Job {{ .Name }}
+{{- range (last10lines .RunnerLog) }}
+            {{ . -}}
+{{ end }}
+{{ end -}}
+{{ end -}}
