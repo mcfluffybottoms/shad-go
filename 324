@@ -1,0 +1,80 @@
+package rwmutex
+
+const writeBit = 1 << 31
+
+type RWMutex struct {
+	mu          chan struct{}
+	state       uint32
+	wakeAll     chan struct{}
+	waitingWriters int
+}
+
+func New() *RWMutex {
+	rw := &RWMutex{
+		mu:      make(chan struct{}, 1),
+		wakeAll: make(chan struct{}),
+	}
+	rw.mu <- struct{}{}
+	return rw
+}
+
+func (rw *RWMutex) RLock() {
+	for {
+		<-rw.mu
+
+		if rw.state&writeBit != 0 || rw.waitingWriters > 0 {
+			ch := rw.wakeAll
+			rw.mu <- struct{}{}
+			<-ch
+			continue
+		}
+
+		rw.state++
+		rw.mu <- struct{}{}
+		return
+	}
+}
+
+func (rw *RWMutex) RUnlock() {
+	<-rw.mu
+	defer func() { rw.mu <- struct{}{} }()
+
+	if rw.state&^writeBit == 0 {
+		panic("RUnlock of unlocked RWMutex")
+	}
+
+	rw.state--
+
+	if rw.state&^writeBit == 0 {
+		close(rw.wakeAll)
+		rw.wakeAll = make(chan struct{})
+	}
+}
+
+func (rw *RWMutex) Lock() {
+	<-rw.mu
+	rw.waitingWriters++
+	for rw.state&^writeBit != 0 || rw.state&writeBit != 0 {
+		ch := rw.wakeAll
+		rw.mu <- struct{}{}
+		<-ch
+		<-rw.mu
+	}
+
+	rw.waitingWriters--
+	rw.state |= writeBit
+	rw.mu <- struct{}{}
+}
+
+func (rw *RWMutex) Unlock() {
+	<-rw.mu
+	defer func() { rw.mu <- struct{}{} }()
+
+	if rw.state&writeBit == 0 {
+		panic("Unlock of unlocked RWMutex")
+	}
+
+	rw.state &^= writeBit
+	close(rw.wakeAll)
+	rw.wakeAll = make(chan struct{})
+}
